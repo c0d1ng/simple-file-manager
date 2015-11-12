@@ -30,6 +30,7 @@ if(isset($_GET['do']) && $_GET['do'] == 'list') {
 	        	'size' => $stat['size'],
 	        	'name' => basename($i),
 	        	'path' => preg_replace('@^\./@', '', $i),
+		        'ext' => pathinfo($i, PATHINFO_EXTENSION),
 	        	'is_dir' => is_dir($i),
 	        	'is_deleteable' => (!is_dir($i) && is_writable($directory)) || 
 	        					   (is_dir($i) && is_writable($directory) && is_recursively_deleteable($i)),
@@ -91,6 +92,36 @@ if(isset($_GET['do']) && $_GET['do'] == 'list') {
 	file_put_contents($file,html_entity_decode($_POST['content']));
 	echo json_encode(array('success' => true));
 	exit;
+} elseif (isset($_POST['do']) && $_POST['do'] == 'zip') {
+	$filename = basename($file);
+	$zip = new ZipArchive();
+	$zip->open($file.time().".zip", ZipArchive::CREATE | ZipArchive::OVERWRITE);
+	$files = new RecursiveIteratorIterator(
+		new RecursiveDirectoryIterator(realpath($file)),
+		RecursiveIteratorIterator::LEAVES_ONLY
+	);
+	foreach ($files as $name => $filez)	{
+		// Skip directories (they would be added automatically)
+		if (!$filez->isDir()){
+			// Get real and relative path for current file
+			$filePath = $filez->getRealPath();
+			$relativePath = substr($filePath, strlen(realpath($file)) + 1);
+            // Add current file to archive
+            $zip->addFile($filePath, $relativePath);
+        }
+	}
+	$zip->close();
+	echo json_encode(array('success' => true));
+	exit;
+} elseif (isset($_POST['do']) && $_POST['do'] == 'unzip') {
+	$zip = new ZipArchive();
+	$zip->open($file);
+	$path = dirname( realpath( $file ) ) . DIRECTORY_SEPARATOR  . basename( $file, '.zip' );
+	if(!file_exists($path)) { mkdir($path); }
+	$zip->extractTo($path);
+	$zip->close();
+	echo json_encode(array('success' => true));
+	exit;
 }
 function get_editable_content($file) {
 	echo '<style>body{margin-top:30px;}.always-top{position:fixed;top:5px;}</style>';
@@ -107,7 +138,7 @@ function rmrf($dir) {
 	if(is_dir($dir)) {
 		$files = array_diff(scandir($dir), array('.','..'));
 		foreach ($files as $file)
-			rmrf("$dir/$file");
+			rmrf( "$dir" . DIRECTORY_SEPARATOR . "$file" );
 		rmdir($dir);
 	} else {
 		unlink($dir);
@@ -120,7 +151,7 @@ function is_recursively_deleteable($d) {
 			return false;
 		$files = array_diff(scandir($dir), array('.','..'));
 		foreach($files as $file) if(is_dir($file)) {
-			$stack[] = "$dir/$file";
+			$stack[] = "$dir" . DIRECTORY_SEPARATOR . "$file";
 		}
 	}
 	return true;
@@ -176,6 +207,10 @@ td.empty { color:#777; font-style: italic; text-align: center;padding:3em 0;}
 .is_dir .size:before {content: "--"; font-size:14px;color:#333;}
 .is_dir .download{visibility: hidden}
 .is_dir .edit{display: none}
+.is_dir .zip{display: inline}
+.zip {display: none}
+.ext-zip .unzip {display: inline}
+.unzip {display: none}
 a.delete {display:inline-block;
 	background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAADtSURBVHjajFC7DkFREJy9iXg0t+EHRKJDJSqRuIVaJT7AF+jR+xuNRiJyS8WlRaHWeOU+kBy7eyKhs8lkJrOzZ3OWzMAD15gxYhB+yzAm0ndez+eYMYLngdkIf2vpSYbCfsNkOx07n8kgWa1UpptNII5VR/M56Nyt6Qq33bbhQsHy6aR0WSyEyEmiCG6vR2ffB65X4HCwYC2e9CTjJGGok4/7Hcjl+ImLBWv1uCRDu3peV5eGQ2C5/P1zq4X9dGpXP+LYhmYz4HbDMQgUosWTnmQoKKf0htVKBZvtFsx6S9bm48ktaV3EXwd/CzAAVjt+gHT5me0AAAAASUVORK5CYII=) no-repeat scroll 0 2px;
 	color:#d00;	margin-left: 15px;font-size:11px;padding:0 0 0 13px;
@@ -199,6 +234,7 @@ a.delete {display:inline-block;
 	display: inline-block;
 }
 .saved { color: green; display: none; font-weight: bold; }
+td.last { text-align: right; }
 </style>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script>
@@ -282,6 +318,18 @@ $(function(){
 			$(this).closest('.first').find('.cancel button').trigger('click.cancel');
 			return false;
 		}
+	});
+	$(document).on('click', '.zip', function (data) {
+		$.post("", {'do': 'zip', file: $(this).attr('data-file'), xsrf: XSRF}, function (response) {
+			list();
+		}, 'json');
+		return false;
+	});
+	$(document).on('click', '.unzip', function (data) {
+		$.post("", {'do': 'unzip', file: $(this).attr('data-file'), xsrf: XSRF}, function (response) {
+			list();
+		}, 'json');
+		return false;
 	});
 	$(document).on('click.rename', '.rename button', function(event) {
 		var $el = $(this);
@@ -436,6 +484,8 @@ $(function(){
 
 		var $dl_link = $('<a/>').attr('href','?do=download&file='+encodeURIComponent(data.path))
 			.addClass('download').text('download');
+		var $zip_link = $('<a href="#" data-file="'+data.path+'"  class="zip">zip</a>');
+		var $unzip_link = $('<span>&nbsp;&nbsp;<a href="#" data-file="'+data.path+'"  class="unzip">unzip</a></span>');
 		var $delete_link = $('<a href="#" />').attr('data-file',data.path).addClass('delete').text('delete');
 		var perms = [];
 		if(data.is_readable) perms.push('read');
@@ -443,6 +493,7 @@ $(function(){
 		if(data.is_executable) perms.push('exec');
 		var $html = $('<tr />')
 			.addClass(data.is_dir ? 'is_dir' : '')
+			.addClass('ext-'+data.ext)
 			.append(
 				$('<td class="first"></td>').append($link)
 					.append($rename_el)
@@ -456,8 +507,10 @@ $(function(){
 			.append( $('<td></td>').attr('data-sort',data.mtime).text(formatTimestamp(data.mtime)) )
 			.append( $('<td></td>').text(perms.join('+')) )
 			.append(
-				$('<td></td>').append($dl_link)
-				.append( data.is_deleteable ? $delete_link : '')
+				$('<td class="last"></td>').append($dl_link )
+					.append($zip_link)
+					.append($unzip_link)
+					.append( data.is_deleteable ? $delete_link : '')
 			)
 		return $html;
 	}
