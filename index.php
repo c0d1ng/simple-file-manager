@@ -50,6 +50,7 @@ if(isset($_GET['do']) && $_GET['do'] == 'list') {
 } elseif (isset($_POST['do']) && $_POST['do'] == 'mkdir') {
 	chdir($file);
 	@mkdir($_POST['name']);
+	echo json_encode(array('success' => true));
 	exit;
 } elseif (isset($_POST['do']) && $_POST['do'] == 'upload') {
 	var_dump($_POST);
@@ -67,10 +68,40 @@ if(isset($_GET['do']) && $_GET['do'] == 'list') {
 	readfile($file);
 	exit;
 } elseif (isset($_GET['do']) && $_GET['do'] == 'view') {
-	$filename = basename($file);
 	header('Content-Type: text/plain');
 	echo file_get_contents($file);
 	exit;
+} elseif (isset($_POST['do']) && $_POST['do'] == 'rename') {
+	$newname = $_POST['name'];
+	$newname = strip_tags($newname);
+	$newname = stripslashes($newname);
+	$newname = preg_replace('/\n|\s|\t/','',$newname);
+	$newname = trim($newname);
+	rename( $file, realpath(dirname($file)) . '/' . $newname );
+	echo json_encode(array('success' => true));
+	exit;
+} elseif (isset($_POST['do']) && $_POST['do'] == 'content') {
+	header('Content-Type: text/plain');
+	echo get_editable_content($file);
+	echo '<pre id="editable" contenteditable>';
+	echo htmlentities(file_get_contents($file),ENT_QUOTES,'utf-8');
+	echo '</pre>';
+	exit;
+} elseif (isset($_POST['do']) && $_POST['do'] == 'content-save') {
+	file_put_contents($file,html_entity_decode($_POST['content']));
+	echo json_encode(array('success' => true));
+	exit;
+}
+function get_editable_content($file) {
+	echo '<style>body{margin-top:30px;}.always-top{position:fixed;top:5px;}</style>';
+	echo '<span class="always-top">';
+	echo '<button id="#save-inside" onclick="';
+	echo 'window.opener.jQuery(window.opener.document).trigger(';
+	echo '\'save.popup\',';
+	echo "['" . htmlentities($file,ENT_QUOTES,'utf-8') . "',";
+	echo 'document.getElementById(\'editable\').innerHTML]';
+	echo ');';
+	echo 'window.close();">save</button><button id="#cancel-inside" onclick="window.close();">cancel</button></span>';
 }
 function rmrf($dir) {
 	if(is_dir($dir)) {
@@ -144,6 +175,7 @@ td.empty { color:#777; font-style: italic; text-align: center;padding:3em 0;}
 .is_dir .size {color:transparent;font-size:0;}
 .is_dir .size:before {content: "--"; font-size:14px;color:#333;}
 .is_dir .download{visibility: hidden}
+.is_dir .edit{display: none}
 a.delete {display:inline-block;
 	background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABGdBTUEAAK/INwWK6QAAABl0RVh0U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAADtSURBVHjajFC7DkFREJy9iXg0t+EHRKJDJSqRuIVaJT7AF+jR+xuNRiJyS8WlRaHWeOU+kBy7eyKhs8lkJrOzZ3OWzMAD15gxYhB+yzAm0ndez+eYMYLngdkIf2vpSYbCfsNkOx07n8kgWa1UpptNII5VR/M56Nyt6Qq33bbhQsHy6aR0WSyEyEmiCG6vR2ffB65X4HCwYC2e9CTjJGGok4/7Hcjl+ImLBWv1uCRDu3peV5eGQ2C5/P1zq4X9dGpXP+LYhmYz4HbDMQgUosWTnmQoKKf0htVKBZvtFsx6S9bm48ktaV3EXwd/CzAAVjt+gHT5me0AAAAASUVORK5CYII=) no-repeat scroll 0 2px;
 	color:#d00;	margin-left: 15px;font-size:11px;padding:0 0 0 13px;
@@ -160,6 +192,13 @@ a.delete {display:inline-block;
 	background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB2klEQVR4nJ2ST2sTQRiHn5mdmj92t9XmUJIWJGq9NHrRgxQiCtqbl97FqxgaL34CP0FD8Qv07EHEU0Ew6EXEk6ci8Q9JtcXEkHR3k+zujIdUqMkmiANzmJdnHn7vzCuIWbe291tSkvhz1pr+q1L2bBwrRgvFrcZKKinfP9zI2EoKmm7Azstf3V7fXK2Wc3ujvIqzAhglwRJoS2ImQZMEBjgyoDS4hv8QGHA1WICvp9yelsA7ITBTIkwWhGBZ0Iv+MUF+c/cB8PTHt08snb+AGAACZDj8qIN6bSe/uWsBb2qV24/GBLn8yl0plY9AJ9NKeL5ICyEIQkkiZenF5XwBDAZzWItLIIR6LGfk26VVxzltJ2gFw2a0FmQLZ+bcbo/DPbcd+PrDyRb+GqRipbGlZtX92UvzjmUpEGC0JgpC3M9dL+qGz16XsvcmCgCK2/vPtTNzJ1x2kkZIRBSivh8Z2Q4+VkvZy6O8HHvWyGyITvA1qndNpxfguQNkc2CIzM0xNk5QLedCEZm1VKsf2XrAXMNrA2vVcq4ZJ4DhvCSAeSALXASuLBTW129U6oPrT969AK4Bq0AeWARs4BRgieMUEkgDmeO9ANipzDnH//nFB0KgAxwATaAFeID5DQNatLGdaXOWAAAAAElFTkSuQmCC) no-repeat scroll 0px 5px;
 	padding:4px 0 4px 20px;
 }
+.first .save, .first .cancel {
+	display: none;
+}
+.first .save.is-visible, .first .cancel.is-visible {
+	display: inline-block;
+}
+.saved { color: green; display: none; font-weight: bold; }
 </style>
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script>
@@ -214,10 +253,77 @@ $(function(){
 	$(window).bind('hashchange',list).trigger('hashchange');
 	$('#table').tablesorter();
 	$(document ).on('click.delete', '.delete', function(event) {
-		debugger;
+		var alert = confirm('are you sure want to delete?');
+		if (!alert) { return false; }
 		$.post("",{'do':'delete',file:$(this).attr('data-file'),xsrf:XSRF},function(response){
 			list();
 		},'json');
+		return false;
+	});
+	function disable_content_editable($parent) {
+		$parent.find('.save' ).removeClass('is-visible');
+		$parent.find('.cancel' ).removeClass('is-visible');
+		$parent.find('.name' ).attr('contentEditable',false);
+	}
+	function enable_content_editable($parent) {
+		$parent.find('.save' ).addClass('is-visible');
+		$parent.find('.cancel' ).addClass('is-visible');
+		$parent.find('.name' ).attr('contentEditable',true).focus();
+	}
+	$(document).on('keydown.name', '.name', function(e) {
+		if( e.keyCode == 13 ) {
+			// #enter
+			e && e.preventDefault && e.preventDefault();
+			$(this).closest('.first').find('.save button').trigger('click.save');
+			return false;
+		} else if( e.keyCode == 27) {
+			// #esc
+			e && e.preventDefault && e.preventDefault();
+			$(this).closest('.first').find('.cancel button').trigger('click.cancel');
+			return false;
+		}
+	});
+	$(document).on('click.rename', '.rename button', function(event) {
+		var $el = $(this);
+		var $parent = $el.closest('.first');
+		enable_content_editable($parent);
+		return false;
+	});
+	$(document).on('click.save', '.save button', function(event) {
+		var $el = $(this);
+		var $parent = $el.closest('.first');
+		disable_content_editable($parent);
+		$.post("",{'do':'rename',file:$(this).attr('data-file'),name:$parent.find('.name').text(),xsrf:XSRF},function(response){
+			list();
+		},'json');
+		return false;
+	});
+	$(document).on('click.cancel', '.cancel button', function(event) {
+		var $el = $(this);
+		var $parent = $el.closest('.first');
+		document.execCommand('undo');
+		$parent.find('.name' ).blur();
+		disable_content_editable($parent);
+		return false;
+	});
+	jQuery(document).on('save.popup',function(e,f,response){
+		$.post("",{'do':'content-save',file:f,content:response,xsrf:XSRF},function(response){
+			var $saved = $('<span class="saved">&nbsp;|&nbsp;Saved!</span>').insertAfter($('.edit [data-file="'+f+'"]' ).parent()).fadeIn();
+			window.setTimeout(function(){$saved.fadeOut();},5000);
+		},'json');
+	});
+
+	$(document).on('click.edit', '.edit button', function(event) {
+		var $el = $(this);
+		var $parent = $el.closest('.first');
+		var popup = window.open("","","resizable=1;width=400,height=400");
+		if(popup && popup.document) {
+			$.post("",{'do':'content',file:$el.attr('data-file'),xsrf:XSRF},function(response){
+				popup.document.write(response);
+			});
+		} else {
+			alert('please enable a popup showing');
+		}
 		return false;
 	});
 	$('#mkdir').submit(function(e) {
@@ -321,6 +427,13 @@ $(function(){
 				.attr('href','?do=view&file='+encodeURIComponent(data.path))
 				.text( data.name );
 		}
+		var $rename_el = $('<span class="rename">&nbsp;|&nbsp;<button>rename</button></span>');
+		var $save_el = $('<span class="save">&nbsp;|&nbsp;<button>save</button></span>');
+		$save_el.find('button').attr('data-file',data.path);
+		var $cancel_el = $('<span class="cancel">&nbsp;|&nbsp;<button>cancel</button></span>' );
+		var $edit_el = $('<span class="edit">&nbsp;|&nbsp;<button>edit</button></span>' );
+		$edit_el.find('button').attr('data-file',data.path);
+
 		var $dl_link = $('<a/>').attr('href','?do=download&file='+encodeURIComponent(data.path))
 			.addClass('download').text('download');
 		var $delete_link = $('<a href="#" />').attr('data-file',data.path).addClass('delete').text('delete');
@@ -330,13 +443,20 @@ $(function(){
 		if(data.is_executable) perms.push('exec');
 		var $html = $('<tr />')
 			.addClass(data.is_dir ? 'is_dir' : '')
-			.append( $('<td class="first" />').append($link) )
-			.append( $('<td/>').attr('data-sort',data.is_dir ? -1 : data.size)
-				.html($('<span class="size" />').text(formatFileSize(data.size))) ) 
-			.append( $('<td/>').attr('data-sort',data.mtime).text(formatTimestamp(data.mtime)) )
-			.append( $('<td/>').text(perms.join('+')) )
 			.append(
-				$('<td/>').append($dl_link)
+				$('<td class="first"></td>').append($link)
+					.append($rename_el)
+					.append($save_el)
+					.append($cancel_el)
+					.append($edit_el)
+			)
+			.append(
+				$('<td></td>').attr('data-sort',data.is_dir ? -1 : data.size).html($('<span class="size"></span>').text(formatFileSize(data.size)))
+			)
+			.append( $('<td></td>').attr('data-sort',data.mtime).text(formatTimestamp(data.mtime)) )
+			.append( $('<td></td>').text(perms.join('+')) )
+			.append(
+				$('<td></td>').append($dl_link)
 				.append( data.is_deleteable ? $delete_link : '')
 			)
 		return $html;
