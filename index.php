@@ -6,31 +6,14 @@ Copyright John Campbell (jcampbell1)
 Liscense: MIT
 ********************************/
 
-/* Uncomment section below, if you want a trivial password protection */
-
-/*
-$PASSWORD = 'sfm'; 
-session_start();
-if(!$_SESSION['_sfm_allowed']) {
-	// sha1, and random bytes to thwart timing attacks.  Not meant as secure hashing.
-	$t = bin2hex(openssl_random_pseudo_bytes(10));	
-	if($_POST['p'] && sha1($t.$_POST['p']) === sha1($t.$PASSWORD)) {
-		$_SESSION['_sfm_allowed'] = true;
-		header('Location: ?');
-	}
-	echo '<html><body><form action=? method=post>PASSWORD:<input type=password name=p /></form></body></html>'; 
-	exit;
-}
-*/
-
 // must be in UTF-8 or `basename` doesn't work
 setlocale(LC_ALL,'en_US.UTF-8');
-
-$tmp = realpath($_REQUEST['file']);
+$tmp = false;
+if(isset($_REQUEST['file'])) {
+	$tmp = realpath( $_REQUEST['file'] );
+}
 if($tmp === false)
 	err(404,'File or Directory Not Found');
-if(substr($tmp, 0,strlen(__DIR__)) !== __DIR__)
-	err(403,"Forbidden");
 
 if(!$_COOKIE['_sfm_xsrf'])
 	setcookie('_sfm_xsrf',bin2hex(openssl_random_pseudo_bytes(16)));
@@ -40,7 +23,7 @@ if($_POST) {
 }
 
 $file = $_REQUEST['file'] ?: '.';
-if($_GET['do'] == 'list') {
+if(isset($_GET['do']) && $_GET['do'] == 'list') {
 	if (is_dir($file)) {
 		$directory = $file;
 		$result = array();
@@ -66,20 +49,20 @@ if($_GET['do'] == 'list') {
 	}
 	echo json_encode(array('success' => true, 'is_writable' => is_writable($file), 'results' =>$result));
 	exit;
-} elseif ($_POST['do'] == 'delete') {
+} elseif (isset($_POST['do']) && $_POST['do'] == 'delete') {
 	rmrf($file);
 	exit;
-} elseif ($_POST['do'] == 'mkdir') {
+} elseif (isset($_POST['do']) && $_POST['do'] == 'mkdir') {
 	chdir($file);
 	@mkdir($_POST['name']);
 	exit;
-} elseif ($_POST['do'] == 'upload') {
+} elseif (isset($_POST['do']) && $_POST['do'] == 'upload') {
 	var_dump($_POST);
 	var_dump($_FILES);
 	var_dump($_FILES['file_data']['tmp_name']);
 	var_dump(move_uploaded_file($_FILES['file_data']['tmp_name'], $file.'/'.$_FILES['file_data']['name']));
 	exit;
-} elseif ($_GET['do'] == 'download') {
+} elseif (isset($_GET['do']) && $_GET['do'] == 'download') {
 	$filename = basename($file);
 	header('Content-Type: ' . mime_content_type($file));
 	header('Content-Length: '. filesize($file));
@@ -111,12 +94,10 @@ function is_recursively_deleteable($d) {
 	}
 	return true;
 }
-
 function err($code,$msg) {
 	echo json_encode(array('error' => array('code'=>intval($code), 'msg' => $msg)));
 	exit;
 }
-
 function asBytes($ini_v) {
 	$ini_v = trim($ini_v);
 	$s = array('g'=> 1<<30, 'm' => 1<<20, 'k' => 1<<10);
@@ -155,6 +136,7 @@ a, a:visited { color:#00c; text-decoration: none}
 a:hover {text-decoration: underline}
 .sort_hide{ display:none;}
 table {border-collapse: collapse;width:100%;}
+table th {cursor: pointer;}
 thead {max-width: 1024px}
 td { padding:.2em 1em .2em .2em; border-bottom:1px solid #def;height:30px; font-size:12px;white-space: nowrap;}
 td.first {font-size:14px;white-space: normal;}
@@ -179,49 +161,51 @@ a.delete {display:inline-block;
 	padding:4px 0 4px 20px;
 }
 </style>
-<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script>
 (function($){
 	$.fn.tablesorter = function() {
 		var $table = this;
 		this.find('th').click(function() {
-			var idx = $(this).index();
-			var direction = $(this).hasClass('sort_asc');
+			var $this = $(this);
+			var idx = $this.index();
+			var direction = $this.hasClass('sort_asc');
 			$table.tablesortby(idx,direction);
 		});
 		return this;
 	};
-	$.fn.tablesortby = function(idx,direction) {
-		var $rows = this.find('tbody tr');
-		function elementToVal(a) {
-			var $a_elem = $(a).find('td:nth-child('+(idx+1)+')');
-			var a_val = $a_elem.attr('data-sort') || $a_elem.text();
-			return (a_val == parseInt(a_val) ? parseInt(a_val) : a_val);
-		}
+	function elementToVal(element, id) {
+		var $a_elem = $(element).find('td:nth-child('+(id+1)+')');
+		var a_val = $a_elem.attr('data-sort') || $a_elem.text();
+		return (a_val == parseInt(a_val) ? parseInt(a_val) : a_val);
+	}
+	$.fn.tablesortby = function(id,direction) {
+		var $this = $(this);
+		$this.find('thead th:nth-child('+(id+1)+')').addClass(direction ? 'sort_desc' : 'sort_asc');
+		var $rows = $this.find('tbody tr');
 		$rows.sort(function(a,b){
-			var a_val = elementToVal(a), b_val = elementToVal(b);
+			var a_val = elementToVal(a, id), b_val = elementToVal(b, id);
 			return (a_val > b_val ? 1 : (a_val == b_val ? 0 : -1)) * (direction ? 1 : -1);
-		})
-		this.find('th').removeClass('sort_asc sort_desc');
-		$(this).find('thead th:nth-child('+(idx+1)+')').addClass(direction ? 'sort_desc' : 'sort_asc');
-		for(var i =0;i<$rows.length;i++)
-			this.append($rows[i]);
+		});
+		$this.find('th').removeClass('sort_asc sort_desc');
+		$this.append($rows);
 		this.settablesortmarkers();
 		return this;
-	}
+	};
 	$.fn.retablesort = function() {
-		var $e = this.find('thead th.sort_asc, thead th.sort_desc');
+		var $e = $(this).find('thead th.sort_asc, thead th.sort_desc');
 		if($e.length)
 			this.tablesortby($e.index(), $e.hasClass('sort_desc') );
 		
 		return this;
-	}
+	};
 	$.fn.settablesortmarkers = function() {
-		this.find('thead th span.indicator').remove();
-		this.find('thead th.sort_asc').append('<span class="indicator">&darr;<span>');
-		this.find('thead th.sort_desc').append('<span class="indicator">&uarr;<span>');
+		var $this = $(this);
+		$this.find('thead th span.indicator').remove();
+		$this.find('thead th.sort_asc').append('<span class="indicator">&darr;<span>');
+		$this.find('thead th.sort_desc').append('<span class="indicator">&uarr;<span>');
 		return this;
-	}
+	};
 })(jQuery);
 $(function(){
 	var XSRF = (document.cookie.match('(^|; )_sfm_xsrf=([^;]*)')||0)[2];
@@ -230,7 +214,7 @@ $(function(){
 	$(window).bind('hashchange',list).trigger('hashchange');
 	$('#table').tablesorter();
 	
-	$('.delete').live('click',function(data) {
+	$('.delete').on('click',function(data) {
 		$.post("",{'do':'delete',file:$(this).attr('data-file'),xsrf:XSRF},function(response){
 			list();
 		},'json');
@@ -249,13 +233,13 @@ $(function(){
 	});
 
 	// file upload stuff
-	$('#file_drop_target').bind('dragover',function(){
+	$('#file_drop_target').on('dragover',function(){
 		$(this).addClass('drag_over');
 		return false;
-	}).bind('dragend',function(){
+	}).on('dragend',function(){
 		$(this).removeClass('drag_over');
 		return false;
-	}).bind('drop',function(e){
+	}).on('drop',function(e){
 		e.preventDefault();
 		var files = e.originalEvent.dataTransfer.files;
 		$.each(files,function(k,file) {
@@ -302,19 +286,20 @@ $(function(){
 	    xhr.send(fd);
 	}
 	function renderFileUploadRow(file,folder) {
-		return $row = $('<div/>')
+		return $('<div/>')
 			.append( $('<span class="fileuploadname" />').text( (folder ? folder+'/':'')+file.name))
 			.append( $('<div class="progress_track"><div class="progress"></div></div>')  )
-			.append( $('<span class="size" />').text(formatFileSize(file.size)) )
+			.append( $('<span class="size" />').text(formatFileSize(file.size)) );
 	};
 	function renderFileSizeErrorRow(file,folder) {
-		return $row = $('<div class="error" />')
+		return $('<div class="error" />')
 			.append( $('<span class="fileuploadname" />').text( 'Error: ' + (folder ? folder+'/':'')+file.name))
 			.append( $('<span/>').html(' file size - <b>' + formatFileSize(file.size) + '</b>'
 				+' exceeds max upload size of <b>' + formatFileSize(MAX_UPLOAD_SIZE) + '</b>')  );
 	}
 
 	function list() {
+		debugger;
 		var hashval = window.location.hash.substr(1);
 		$.get('?',{'do':'list','file':hashval},function(data) {
 			$tbody.empty();
@@ -332,6 +317,7 @@ $(function(){
 		},'json');
 	}
 	function renderFileRow(data) {
+		debugger
 		var $link = $('<a class="name" />')
 			.attr('href', data.is_dir ? '#' + data.path : './'+data.path)
 			.text(data.name);
@@ -353,6 +339,7 @@ $(function(){
 		return $html;
 	}
 	function renderBreadcrumbs(path) {
+		debugger
 		var base = "",
 			$html = $('<div/>').append( $('<a href=#>Home</a></div>') );
 		$.each(path.split('/'),function(k,v){
