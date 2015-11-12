@@ -1,7 +1,6 @@
 simple-file-manager
 ===================
-
-A Simple PHP file manager.  The code is a single php file.  
+This is update for Simple PHP file manager.  The code is a single php file.  
 
 Just copy `index.php` to a folder on your webserver.
 
@@ -14,6 +13,15 @@ Just copy `index.php` to a folder on your webserver.
 - Works with Unicode file names
 - The interface is usable from an iPad
 - XSRF protection (though no authentication system)
+
+## Features
+- Browse file
+- Download file
+- File removing
+- File editing
+- Folder zip
+- Unzip
+- Rename
 
 ## Screenshot
 
