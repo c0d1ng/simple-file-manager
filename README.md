@@ -25,4 +25,4 @@ Just copy `index.php` to a folder on your webserver.
 
 ## Screenshot
 
-![Screenshot](https://raw.github.com/AngeIII/simple-file-manager/master/screenshot.png "Screenshot")
+![Screenshot](https://raw.github.com/AngeIII/simple-file-manager/master/screenshot.png?v=1 "Screenshot")
