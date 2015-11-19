@@ -84,9 +84,9 @@ if(isset($_GET['do']) && $_GET['do'] == 'list') {
 } elseif (isset($_POST['do']) && $_POST['do'] == 'content') {
 	header('Content-Type: text/plain');
 	echo get_editable_content($file);
-	echo '<pre id="editable" contenteditable>';
+	echo '<textarea id="editable" rows="20" style="height: 100%; box-sizing: border-box;width:100%">';
 	echo htmlentities(file_get_contents($file),ENT_QUOTES,'utf-8');
-	echo '</pre>';
+	echo '</textarea>';
 	exit;
 } elseif (isset($_POST['do']) && $_POST['do'] == 'content-save') {
 	file_put_contents($file,html_entity_decode($_POST['content']));
@@ -130,7 +130,7 @@ function get_editable_content($file) {
 	echo 'window.opener.jQuery(window.opener.document).trigger(';
 	echo '\'save.popup\',';
 	echo "['" . htmlentities($file,ENT_QUOTES,'utf-8') . "',";
-	echo 'document.getElementById(\'editable\').innerHTML]';
+	echo 'document.getElementById(\'editable\').value]';
 	echo ');';
 	echo 'window.close();">save</button><button id="#cancel-inside" onclick="window.close();">cancel</button></span>';
 }
