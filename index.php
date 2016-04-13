@@ -16,7 +16,7 @@ if($_POST) {
 		err(403,"XSRF Failure");
 }
 
-$file = isset($_REQUEST['file']) ? $_REQUEST['file'] : '.';
+$file = isset($_REQUEST['file']) ? urldecode($_REQUEST['file']) : '.';
 if(isset($_GET['do']) && $_GET['do'] == 'list') {
 	if (is_dir($file)) {
 		$directory = $file;
